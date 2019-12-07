@@ -1,0 +1,110 @@
+---
+title: "Untitled"
+author: "kyusque"
+date: "2019/12/7"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+```
+
+
+```{r}
+data_ <- c(14,6,56,44)
+data <- matrix(c(14,6,56,44),2,2,byrow=T)
+data %>% rbind(c(70, 50)) %>% cbind(c(20, 100, 120))
+```
+
+```{r}
+# Arrangement Matrix
+# 手作業による温かいプログラム
+a <- matrix(c(
+  1,1,0,0,
+  0,0,1,1,
+  1,0,1,0,
+  0,1,0,1),4,4,byrow = T)
+cat(paste(nrow(a), ncol(a), "\n"), file = "A.mat")
+for(i in seq_len(nrow(a))){
+  cat(paste(a[i,], collapse = " "), file = "A.mat", append = T)
+  cat("\n", file = "A.mat", append = T)
+}
+```
+
+```{bash}
+# A command in 4ti2
+# Generating A.mar from A.mat
+markov A
+```
+
+
+```{r}
+chi_square <- function(x){
+  # From chisq.test
+  x <-  matrix(x,2,2,byrow=T)
+  n <- sum(x)
+  nr <- as.integer(nrow(x))
+  nc <- as.integer(ncol(x))
+  sr <- rowSums(x)
+  sc <- colSums(x)
+  E <- outer(sr, sc, "*")/n
+  v <- function(r, c, n) c * r * (n - r) * (n - c)/n^3
+  V <- outer(sr, sc, v, n)
+  YATES <- min(0.5, abs(x - E))
+  STATISTIC <- sum((abs(x - E) - YATES)^2/E)
+  STATISTIC
+}
+
+# 2x2用の関数
+hypergeometric_dist <- function(x){
+  beta <- (a %*% data_)[,1]
+  choose(beta[1], x[1]) * choose(beta[2], beta[3] - x[1]) / choose(sum(beta), beta[3])
+}
+
+mar <- read.table("A.mar", skip = 1)
+move <- rbind(mar, -mar)
+
+mcmc <- function(x_obs, move, n, test_static, null_dist){
+  #step 1
+  x <- x_obs
+  obs <- test_static(x_obs)
+  count <- 0
+  sig <- 0
+  #step 2-7
+  while(count < n){
+      #step 2-3
+      x_next <- as.numeric(x + sample_n(move, 1))
+      #step 3
+      if(all(x_next >= 0)){
+        u <- runif(1)
+        #step 4
+        if(u > null_dist(x_next) / null_dist(x)){
+          x_next <- x
+        }
+      }else{
+        x_next <- x
+      }
+      #step 5
+      if(test_static(x_next) >= obs){
+        sig <- sig + 1
+      }
+      #step 6
+      x <- x_next
+      count <- count + 1
+      #step 7
+      if(count %% 100 == 0) print(x_next)
+  }
+  sig / n
+}
+
+
+```
+
+```{r}
+chisq.test(data)
+```
+
+```{r}
+mcmc(data_, move, 100000, chi_square, hypergeometric_dist)
+```
+
